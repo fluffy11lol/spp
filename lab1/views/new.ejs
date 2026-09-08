@@ -1,0 +1,86 @@
+<%- include('partials/header') %>
+
+<div class="card" style="max-width: 850px; margin: 0 auto;">
+  <h2 style="margin-bottom: 1.5rem;">Create New Snippet</h2>
+
+  <% if (error) { %>
+    <div class="alert alert-danger">
+      <%= error %>
+    </div>
+  <% } %>
+
+  <form action="/snippets" method="POST" enctype="multipart/form-data">
+    <div class="form-row">
+      <div class="form-group" style="flex: 2;">
+        <label class="form-label" for="title">Title / Description</label>
+        <input type="text" id="title" name="title" class="form-control" placeholder="e.g. main.go or docker-compose.yml" value="<%= formData.title || '' %>">
+      </div>
+
+      <div class="form-group" style="flex: 1;">
+        <label class="form-label" for="language">Syntax Language</label>
+        <select id="language" name="language" class="form-control">
+          <% supportedLanguages.forEach(lang => { %>
+            <option value="<%= lang.id %>" <%= formData.language === lang.id ? 'selected' : '' %>><%= lang.name %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="content">Code or Text Content</label>
+      <textarea id="content" name="content" class="form-control code-editor" placeholder="Paste your code, configuration or log text here..."><%= formData.content || '' %></textarea>
+      <div class="form-hint">Or leave empty and attach a text file below to auto-import its content.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="file">Attach File</label>
+      <input type="file" id="file" name="file" class="form-control" style="padding: 0.5rem;">
+      <div class="form-hint">Maximum file size: 10 MB. Can be downloaded from the snippet page.</div>
+    </div>
+
+    <div class="form-row" style="margin-top: 1.5rem; align-items: center;">
+      <div class="form-group">
+        <label class="form-label" for="expiry">Expiration</label>
+        <select id="expiry" name="expiry" class="form-control" onchange="toggleCustomDate(this.value)">
+          <option value="never" <%= formData.expiry === 'never' ? 'selected' : '' %>>Never</option>
+          <option value="10m" <%= formData.expiry === '10m' ? 'selected' : '' %>>10 Minutes</option>
+          <option value="1h" <%= formData.expiry === '1h' ? 'selected' : '' %>>1 Hour</option>
+          <option value="1d" <%= formData.expiry === '1d' ? 'selected' : '' %>>1 Day</option>
+          <option value="1w" <%= formData.expiry === '1w' ? 'selected' : '' %>>1 Week</option>
+          <option value="1m" <%= formData.expiry === '1m' ? 'selected' : '' %>>1 Month</option>
+          <option value="custom" <%= formData.expiry === 'custom' ? 'selected' : '' %>>Custom Date...</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="customDateGroup" style="display: <%= formData.expiry === 'custom' ? 'block' : 'none' %>;">
+        <label class="form-label" for="custom_expiry_date">Expiration Date</label>
+        <input type="datetime-local" id="custom_expiry_date" name="custom_expiry_date" class="form-control" value="<%= formData.custom_expiry_date || '' %>">
+      </div>
+    </div>
+
+    <div class="form-group" style="margin: 1.25rem 0;">
+      <label class="checkbox-label">
+        <input type="checkbox" name="is_unlisted" <%= formData.is_unlisted ? 'checked' : '' %>>
+        <span>Unlisted (Hidden from public snippet list, accessible only via direct link)</span>
+      </label>
+    </div>
+
+    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+      <button type="submit" class="btn btn-primary" style="padding: 0.65rem 1.75rem;">Create Snippet</button>
+      <a href="/" class="btn btn-outline" style="padding: 0.65rem 1.25rem;">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  function toggleCustomDate(val) {
+    const group = document.getElementById('customDateGroup');
+    if (val === 'custom') {
+      group.style.display = 'block';
+    } else {
+      group.style.display = 'none';
+    }
+  }
+</script>
+
+<%- include('partials/footer') %>

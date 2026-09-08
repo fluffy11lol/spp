@@ -1,0 +1,105 @@
+<%- include('partials/header') %>
+
+<div class="filter-bar">
+  <form action="/" method="GET" class="filter-form">
+    <div class="filter-item" style="flex: 2;">
+      <label class="form-label" for="search">Search</label>
+      <input type="text" id="search" name="search" class="form-control" placeholder="Search by title, code or file..." value="<%= search %>">
+    </div>
+
+    <div class="filter-item">
+      <label class="form-label" for="language">Language</label>
+      <select id="language" name="language" class="form-control">
+        <option value="all" <%= language === 'all' ? 'selected' : '' %>>All Languages</option>
+        <% supportedLanguages.forEach(lang => { %>
+          <option value="<%= lang.id %>" <%= language === lang.id ? 'selected' : '' %>><%= lang.name %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="filter-item">
+      <label class="form-label" for="status">Status</label>
+      <select id="status" name="status" class="form-control">
+        <option value="active" <%= status === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="expired" <%= status === 'expired' ? 'selected' : '' %>>Expired</option>
+        <option value="all" <%= status === 'all' ? 'selected' : '' %>>All</option>
+      </select>
+    </div>
+
+    <div class="filter-actions">
+      <button type="submit" class="btn btn-primary">Filter</button>
+      <% if (search || (language && language !== 'all') || (status && status !== 'active')) { %>
+        <a href="/" class="btn btn-outline">Reset</a>
+      <% } %>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+    <h2>Public Snippets</h2>
+    <span style="color: var(--text-muted); font-size: 0.85rem;"><%= snippets.length %> total</span>
+  </div>
+
+  <% if (snippets.length === 0) { %>
+    <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+      <p style="font-size: 1rem; margin-bottom: 1.25rem;">No snippets found matching your query.</p>
+      <a href="/snippets/new" class="btn btn-primary">+ Create First Snippet</a>
+    </div>
+  <% } else { %>
+    <div style="overflow-x: auto;">
+      <table class="snippets-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Language</th>
+            <th>Created</th>
+            <th>Expires</th>
+            <th>Views</th>
+            <th>File</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% snippets.forEach(snippet => { %>
+            <tr>
+              <td class="snippet-title-cell">
+                <a href="/snippets/<%= snippet.id %>"><%= snippet.title %></a>
+              </td>
+              <td>
+                <span class="badge badge-lang"><%= snippet.language %></span>
+              </td>
+              <td style="color: var(--text-muted); font-size: 0.85rem;">
+                <%= snippet.formattedCreated %>
+              </td>
+              <td>
+                <% if (snippet.isExpired) { %>
+                  <span class="badge badge-expired">Expired</span>
+                <% } else if (snippet.expires_at) { %>
+                  <span class="badge badge-active"><%= snippet.formattedExpires %></span>
+                <% } else { %>
+                  <span class="badge badge-neutral">Never</span>
+                <% } %>
+              </td>
+              <td style="color: var(--text-muted); font-size: 0.85rem;">
+                <%= snippet.views_count %>
+              </td>
+              <td>
+                <% if (snippet.file_path) { %>
+                  <a href="/snippets/<%= snippet.id %>/download" title="<%= snippet.file_original_name %> (<%= snippet.formattedSize %>)" class="file-icon-link">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                    </svg>
+                  </a>
+                <% } else { %>
+                  <span style="color: var(--text-muted); opacity: 0.3;">—</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>
