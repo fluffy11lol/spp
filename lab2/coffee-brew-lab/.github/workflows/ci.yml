@@ -1,0 +1,45 @@
+name: CI Quality Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  verify:
+    name: Typecheck, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install Backend Dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Backend Typecheck & Schema Tests
+        working-directory: ./server
+        run: |
+          npx tsc --noEmit
+          npm run test:unit
+
+      - name: Install Frontend Dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Frontend Typecheck & Production Build
+        working-directory: ./client
+        run: |
+          npx tsc --noEmit
+          npm run build

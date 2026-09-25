@@ -31,6 +31,17 @@ services:
     volumes:
       - minio_data:/data
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: coffee_mailpit
+    restart: unless-stopped
+    ports:
+      - "${SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_WEB_PORT:-8025}:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_DATABASE: ""
+
   api:
     build:
       context: ./server
@@ -47,12 +58,18 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadminpassword}
       MINIO_BUCKET: ${MINIO_BUCKET:-coffee-uploads}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      JWT_SECRET: ${JWT_SECRET:-supersecretbrewlogjwtkey1234567890specialtycoffee}
+      CLIENT_URL: http://localhost:3000
     ports:
       - "${API_PORT:-4000}:4000"
     depends_on:
       db:
         condition: service_healthy
       minio:
+        condition: service_started
+      mailpit:
         condition: service_started
 
   client:

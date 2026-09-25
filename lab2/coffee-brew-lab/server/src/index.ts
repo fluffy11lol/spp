@@ -1,45 +1,159 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import jwt from '@fastify/jwt';
+import cookie from '@fastify/cookie';
+import rateLimit from '@fastify/rate-limit';
+import crypto from 'crypto';
+
 import { initDatabase, pool } from './db/index.js';
 import { initMinio, minioClient, BUCKET_NAME } from './utils/minio.js';
 import { recipesRoutes } from './routes/recipes.routes.js';
+import { authRoutes } from './routes/auth.routes.js';
 
-const fastify = Fastify({
-  logger: {
-    transport:
-      process.env.NODE_ENV !== 'production'
-        ? {
-            target: 'pino-pretty',
-            options: {
-              translateTime: 'HH:MM:ss Z',
-              ignore: 'pid,hostname',
-            },
-          }
-        : undefined,
-  },
-});
+declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireRole: (roles: string[]) => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
 
+export function buildServer() {
+  const server = Fastify({
+    requestIdHeader: 'x-request-id',
+    genReqId: (req) => (req.headers['x-request-id'] as string) || crypto.randomUUID(),
+    logger: {
+      transport:
+        process.env.NODE_ENV !== 'production'
+          ? {
+              target: 'pino-pretty',
+              options: {
+                translateTime: 'HH:MM:ss Z',
+                ignore: 'pid,hostname',
+              },
+            }
+          : undefined,
+    },
+  });
+
+  return server;
+}
+
+const fastify = buildServer();
+
+// Global CORS
 await fastify.register(cors, {
   origin: true,
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 });
 
+// Cookie parsing
+await fastify.register(cookie);
+
+// Global Rate Limiter & Brute-Force Shield
+await fastify.register(rateLimit, {
+  max: 120,
+  timeWindow: '1 minute',
+  errorResponseBuilder: (req, context) => ({
+    statusCode: 429,
+    error: 'Too Many Requests',
+    message: `Rate limit threshold exceeded. Please retry in ${Math.ceil(context.ttl / 1000)} seconds.`,
+    requestId: req.id,
+    timestamp: new Date().toISOString(),
+    path: req.url,
+  }),
+});
+
+// Multipart support
 await fastify.register(multipart, {
   limits: {
     fileSize: 5 * 1024 * 1024,
   },
 });
 
+// JWT Authentication Setup
+await fastify.register(jwt, {
+  secret: process.env.JWT_SECRET || 'supersecretbrewlogjwtkey1234567890specialtycoffee',
+});
+
+// Fastify Authentication Decorators
+fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    await request.jwtVerify();
+  } catch (err: any) {
+    return reply.status(401).send({
+      statusCode: 401,
+      error: 'Unauthorized',
+      message: 'Authentication token is missing, expired, or invalid',
+      requestId: request.id,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+    });
+  }
+});
+
+fastify.decorate('requireRole', (allowedRoles: string[]) => {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const user = (request as any).user;
+    if (!user || !allowedRoles.includes(user.role)) {
+      return reply.status(403).send({
+        statusCode: 403,
+        error: 'Forbidden',
+        message: `Insufficient permissions. Access requires one of: [${allowedRoles.join(', ')}]`,
+        requestId: request.id,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+      });
+    }
+  };
+});
+
+// Centralized Semantic Error Handling (RFC 7807 / RFC 9110)
+fastify.setErrorHandler((error, request, reply) => {
+  const statusCode = error.statusCode || 500;
+
+  request.log.error(
+    {
+      err: error,
+      reqId: request.id,
+      method: request.method,
+      url: request.url,
+      statusCode,
+    },
+    'Server request error'
+  );
+
+  reply.status(statusCode).send({
+    statusCode,
+    error: error.name || 'Internal Server Error',
+    message: error.message || 'An unexpected error occurred',
+    details: (error as any).details || (error as any).validation || undefined,
+    requestId: request.id,
+    timestamp: new Date().toISOString(),
+    path: request.url,
+  });
+});
+
+// Swagger OpenAPI documentation
 await fastify.register(swagger, {
   openapi: {
     info: {
       title: 'Specialty Coffee Brew Lab API',
       description:
-        'REST API documentation for coffee extraction recipes, sensory profiling, and MinIO S3 media storage.',
-      version: '1.0.0',
+        'Production REST API with RBAC authentication (JWT/Refresh), rate limiting, audit logging, and MinIO S3 media storage.',
+      version: '2.0.0',
+    },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
     },
     servers: [
       {
@@ -52,7 +166,9 @@ await fastify.register(swagger, {
       },
     ],
     tags: [
-      { name: 'Recipes', description: 'Coffee recipe CRUD operations' },
+      { name: 'Auth', description: 'Authentication, registration, sessions, and password recovery' },
+      { name: 'Recipes', description: 'Coffee recipe CRUD operations with role validation' },
+      { name: 'Admin', description: 'Administrative operations and audit logs' },
       { name: 'System', description: 'Health check and monitoring' },
     ],
   },
@@ -67,14 +183,10 @@ await fastify.register(swaggerUi, {
   staticCSP: true,
 });
 
-fastify.get('/docs', async (_, reply) => {
-  return reply.redirect('/documentation');
-});
+fastify.get('/docs', async (_, reply) => reply.redirect('/documentation'));
+fastify.get('/swagger', async (_, reply) => reply.redirect('/documentation'));
 
-fastify.get('/swagger', async (_, reply) => {
-  return reply.redirect('/documentation');
-});
-
+// MinIO S3 Image streamer
 fastify.get(
   '/uploads/:filename',
   {
@@ -108,13 +220,21 @@ fastify.get(
       reply.header('Cache-Control', 'public, max-age=86400');
       return reply.send(stream);
     } catch {
-      return reply.code(404).send({ error: 'File not found' });
+      return reply.status(404).send({
+        statusCode: 404,
+        error: 'NotFound',
+        message: 'The requested media file was not found in S3 storage',
+        requestId: req.id,
+      });
     }
   }
 );
 
+// Register feature routes
+await fastify.register(authRoutes, { prefix: '/api' });
 await fastify.register(recipesRoutes, { prefix: '/api' });
 
+// Health check endpoint
 fastify.get(
   '/api/health',
   {
@@ -132,9 +252,7 @@ fastify.get(
       },
     },
   },
-  async () => {
-    return { status: 'ok', timestamp: new Date().toISOString() };
-  }
+  async () => ({ status: 'ok', timestamp: new Date().toISOString() })
 );
 
 const start = async () => {
@@ -143,7 +261,7 @@ const start = async () => {
     fastify.log.info('MinIO S3 storage initialized successfully');
 
     await initDatabase();
-    fastify.log.info('Database initialized successfully');
+    fastify.log.info('PostgreSQL database & tables initialized successfully');
 
     const port = parseInt(process.env.PORT || '4000', 10);
     const host = process.env.HOST || '0.0.0.0';
@@ -165,4 +283,6 @@ const stop = async () => {
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
 
-start();
+if (process.env.NODE_ENV !== 'test') {
+  start();
+}

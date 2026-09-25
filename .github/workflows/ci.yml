@@ -1,0 +1,45 @@
+name: CI Quality Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  verify:
+    name: Typecheck, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            lab2/coffee-brew-lab/server/package-lock.json
+            lab2/coffee-brew-lab/client/package-lock.json
+
+      - name: Install Backend Dependencies
+        working-directory: ./lab2/coffee-brew-lab/server
+        run: npm ci
+
+      - name: Backend Typecheck & Schema Tests
+        working-directory: ./lab2/coffee-brew-lab/server
+        run: |
+          npx tsc --noEmit
+          npm run test:unit
+
+      - name: Install Frontend Dependencies
+        working-directory: ./lab2/coffee-brew-lab/client
+        run: npm ci
+
+      - name: Frontend Typecheck & Production Build
+        working-directory: ./lab2/coffee-brew-lab/client
+        run: |
+          npx tsc --noEmit
+          npm run build

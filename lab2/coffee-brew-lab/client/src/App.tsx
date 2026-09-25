@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Recipe } from './types/recipe';
 import { useRecipes } from './context/RecipeContext';
+import { useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { FilterBar } from './components/FilterBar';
 import { RecipeCard } from './components/RecipeCard';
@@ -8,6 +9,10 @@ import { RecipeModal } from './components/RecipeModal';
 import { BrewTimerModal } from './components/BrewTimerModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { SkeletonCard } from './components/SkeletonCard';
+import { AuthModal } from './components/AuthModal';
+import { SessionsModal } from './components/SessionsModal';
+import { AuditLogsModal } from './components/AuditLogsModal';
+import { ResetPasswordModal } from './components/ResetPasswordModal';
 import { Coffee, PlusCircle } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -23,6 +28,8 @@ export const App: React.FC = () => {
     deleteRecipe,
   } = useRecipes();
 
+  const { canCreate } = useAuth();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
 
@@ -31,6 +38,22 @@ export const App: React.FC = () => {
 
   const [deletingRecipe, setDeletingRecipe] = useState<Recipe | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  // Auth, Sessions, Audit, Password Reset Modals
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isSessionsOpen, setIsSessionsOpen] = useState(false);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
+
+  const [resetToken, setResetToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if user followed a password reset link (?reset_token=xyz)
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('reset_token');
+    if (token) {
+      setResetToken(token);
+    }
+  }, []);
 
   const handleCreateOrUpdate = async (formData: FormData) => {
     if (editingRecipe) {
@@ -47,6 +70,9 @@ export const App: React.FC = () => {
           setEditingRecipe(null);
           setIsModalOpen(true);
         }}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenSessions={() => setIsSessionsOpen(true)}
+        onOpenAudit={() => setIsAuditOpen(true)}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-16">
@@ -69,23 +95,25 @@ export const App: React.FC = () => {
                 ? 'Try adjusting your search criteria or resetting filters.'
                 : 'Your coffee lab is empty. Start by adding your first specialty coffee recipe!'}
             </p>
-            <button
-              onClick={() => {
-                if (search || selectedMethod !== 'All') {
-                  setSearch('');
-                  setSelectedMethod('All');
-                } else {
-                  setEditingRecipe(null);
-                  setIsModalOpen(true);
-                }
-              }}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>
-                {search || selectedMethod !== 'All' ? 'Reset Filters' : 'Create First Recipe'}
-              </span>
-            </button>
+            {canCreate && (
+              <button
+                onClick={() => {
+                  if (search || selectedMethod !== 'All') {
+                    setSearch('');
+                    setSelectedMethod('All');
+                  } else {
+                    setEditingRecipe(null);
+                    setIsModalOpen(true);
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>
+                  {search || selectedMethod !== 'All' ? 'Reset Filters' : 'Create First Recipe'}
+                </span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -111,6 +139,7 @@ export const App: React.FC = () => {
         )}
       </main>
 
+      {/* Recipe Create/Edit Modal */}
       <RecipeModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -121,6 +150,7 @@ export const App: React.FC = () => {
         initialData={editingRecipe}
       />
 
+      {/* Interactive Brew Timer Modal */}
       <BrewTimerModal
         isOpen={isTimerOpen}
         onClose={() => {
@@ -130,6 +160,7 @@ export const App: React.FC = () => {
         recipe={timerRecipe}
       />
 
+      {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         isOpen={isDeleteOpen}
         recipe={deletingRecipe}
@@ -138,6 +169,34 @@ export const App: React.FC = () => {
           setDeletingRecipe(null);
         }}
         onConfirm={deleteRecipe}
+      />
+
+      {/* RBAC Auth & Switcher Modal */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+      />
+
+      {/* Active Sessions Dashboard Modal */}
+      <SessionsModal
+        isOpen={isSessionsOpen}
+        onClose={() => setIsSessionsOpen(false)}
+      />
+
+      {/* Security & Audit Logs Modal */}
+      <AuditLogsModal
+        isOpen={isAuditOpen}
+        onClose={() => setIsAuditOpen(false)}
+      />
+
+      {/* Password Reset Modal via email link */}
+      <ResetPasswordModal
+        token={resetToken}
+        onClose={() => setResetToken(null)}
+        onSuccess={() => {
+          setResetToken(null);
+          setIsAuthOpen(true);
+        }}
       />
     </div>
   );

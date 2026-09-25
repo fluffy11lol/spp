@@ -1,7 +1,63 @@
 import type { PoolClient } from 'pg';
+import bcrypt from 'bcryptjs';
 import { minioClient, BUCKET_NAME } from '../utils/minio.js';
 
 export async function seedInitialData(client: PoolClient): Promise<void> {
+  // 1. Seed Default Users
+  const userCountRes = await client.query('SELECT COUNT(*) FROM users');
+  const userCount = parseInt(userCountRes.rows[0].count, 10);
+
+  let baristaId: number | null = null;
+
+  if (userCount === 0) {
+    const defaultPassword = 'Password123!';
+    const saltRounds = 10;
+    const defaultHash = await bcrypt.hash(defaultPassword, saltRounds);
+
+    const adminRes = await client.query(
+      `INSERT INTO users (email, password_hash, name, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      ['admin@brewlog.local', defaultHash, 'Head Roaster Admin', 'Admin']
+    );
+
+    const baristaRes = await client.query(
+      `INSERT INTO users (email, password_hash, name, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      ['barista@brewlog.local', defaultHash, 'James Hoffmann', 'Barista']
+    );
+    baristaId = baristaRes.rows[0].id;
+
+    await client.query(
+      `INSERT INTO users (email, password_hash, name, role)
+       VALUES ($1, $2, $3, $4)`,
+      ['taster@brewlog.local', defaultHash, 'Q-Grader Taster', 'Taster']
+    );
+
+    // Initial audit log
+    await client.query(
+      `INSERT INTO audit_logs (event_type, user_id, user_email, user_role, ip_address, details)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        'SYSTEM_INIT',
+        adminRes.rows[0].id,
+        'admin@brewlog.local',
+        'Admin',
+        '127.0.0.1',
+        JSON.stringify({ message: 'Default system users seeded successfully' }),
+      ]
+    );
+  } else {
+    const existingBarista = await client.query(
+      "SELECT id FROM users WHERE email = 'barista@brewlog.local' LIMIT 1"
+    );
+    if (existingBarista.rows.length > 0) {
+      baristaId = existingBarista.rows[0].id;
+    }
+  }
+
+  // 2. Seed Default Recipes
   const countRes = await client.query('SELECT COUNT(*) FROM recipes');
   const count = parseInt(countRes.rows[0].count, 10);
   if (count > 0) {
@@ -28,6 +84,7 @@ export async function seedInitialData(client: PoolClient): Promise<void> {
       tasting_notes: ['Bergamot', 'Jasmine', 'White Peach', 'Black Tea'],
       processing_method: 'Washed',
       image_url: '/uploads/ethiopia-chelchele.svg',
+      author_name: 'James Hoffmann',
     },
     {
       title: 'Colombia Geisha Finca El Paraiso',
@@ -46,6 +103,7 @@ export async function seedInitialData(client: PoolClient): Promise<void> {
       tasting_notes: ['Red Currant', 'Rose Petals', 'Lychee', 'Wild Strawberry'],
       processing_method: 'Anaerobic',
       image_url: '/uploads/colombia-geisha.svg',
+      author_name: 'James Hoffmann',
     },
     {
       title: 'Kenya Nyeri Hill Peaberry',
@@ -64,6 +122,7 @@ export async function seedInitialData(client: PoolClient): Promise<void> {
       tasting_notes: ['Pink Grapefruit', 'Blackcurrant', 'Rhubarb', 'Rosehip'],
       processing_method: 'Washed',
       image_url: '/uploads/kenya-nyeri.svg',
+      author_name: 'James Hoffmann',
     },
     {
       title: 'Costa Rica Las Lajas Black Diamond',
@@ -82,6 +141,7 @@ export async function seedInitialData(client: PoolClient): Promise<void> {
       tasting_notes: ['Ripe Plum', 'Dark Chocolate', 'Aged Rum', 'Dried Fig'],
       processing_method: 'Black Honey',
       image_url: '/uploads/costa-rica.svg',
+      author_name: 'James Hoffmann',
     },
     {
       title: 'Guatemala Huehuetenango La Bolsa',
@@ -100,6 +160,7 @@ export async function seedInitialData(client: PoolClient): Promise<void> {
       tasting_notes: ['Red Apple', 'Salted Caramel', 'Walnut', 'Milk Chocolate'],
       processing_method: 'Washed',
       image_url: '/uploads/guatemala.svg',
+      author_name: 'James Hoffmann',
     },
   ];
 
@@ -108,8 +169,9 @@ export async function seedInitialData(client: PoolClient): Promise<void> {
       `INSERT INTO recipes (
         title, roaster, origin, method, coffee_weight, water_amount,
         water_temperature, grind_size, brew_time_seconds, rating,
-        acidity, sweetness, body, tasting_notes, processing_method, image_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        acidity, sweetness, body, tasting_notes, processing_method, image_url,
+        author_id, author_name
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
       [
         r.title,
         r.roaster,
@@ -127,6 +189,8 @@ export async function seedInitialData(client: PoolClient): Promise<void> {
         r.tasting_notes,
         r.processing_method,
         r.image_url,
+        baristaId,
+        r.author_name,
       ]
     );
   }

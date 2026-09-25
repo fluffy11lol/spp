@@ -8,6 +8,38 @@ export type BrewMethod =
   | 'Cold Brew'
   | 'Clever';
 
+export type UserRole = 'Taster' | 'Barista' | 'Admin';
+
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
+export interface UserSession {
+  id: string;
+  user_id: number;
+  user_agent: string | null;
+  ip_address: string | null;
+  created_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  user_email?: string;
+  user_role?: string;
+}
+
+export interface AuditLog {
+  id: number;
+  event_type: string;
+  user_id: number | null;
+  user_email: string | null;
+  user_role: string | null;
+  ip_address: string | null;
+  details: Record<string, any>;
+  created_at: string;
+}
+
 export interface Recipe {
   id: number;
   title: string;
@@ -26,12 +58,18 @@ export interface Recipe {
   tastingNotes: string[];
   imageUrl?: string | null;
   processingMethod?: string;
+  authorId?: number | null;
+  authorName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface ApiErrorResponse {
+export interface ApiProblemDetails {
+  statusCode: number;
   error: string;
-  message?: string;
-  fields?: Record<string, string>;
+  message: string;
+  details?: Record<string, any>;
+  requestId?: string;
+  timestamp?: string;
+  path?: string;
 }
