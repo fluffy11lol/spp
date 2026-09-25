@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Play,
   Edit2,
@@ -6,8 +7,10 @@ import {
   Thermometer,
   Clock,
   Scale,
+  User as UserIcon,
 } from 'lucide-react';
 import type { Recipe } from '../types/recipe';
+import { useAuth } from '../context/AuthContext';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -22,7 +25,11 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   onDelete,
   onStartBrew,
 }) => {
+  const { canEdit, canDelete } = useAuth();
   const ratio = (recipe.waterAmount / recipe.coffeeWeight).toFixed(1);
+
+  const isEditable = canEdit(recipe);
+  const isDeletable = canDelete(recipe);
 
   const formatTime = (totalSec: number) => {
     const m = Math.floor(totalSec / 60);
@@ -75,10 +82,16 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
       {/* Card Content */}
       <div className="p-5 flex-1 flex flex-col justify-between">
         <div>
-          <div className="mb-1">
+          <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-wider text-amber-500/90">
               {recipe.roaster}
             </span>
+            {recipe.authorName && (
+              <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                <UserIcon className="w-2.5 h-2.5" />
+                <span>{recipe.authorName}</span>
+              </span>
+            )}
           </div>
           <h3 className="font-bold text-base text-zinc-100 leading-snug mb-1 line-clamp-1">
             {recipe.title}
@@ -188,6 +201,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
 
         {/* Action Buttons */}
         <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+          {/* Brew Timer is accessible to all roles including Taster */}
           <button
             onClick={() => onStartBrew(recipe)}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500 text-amber-400 hover:text-zinc-950 font-semibold text-xs border border-amber-500/30 hover:border-transparent transition-all duration-200 active:scale-95"
@@ -196,21 +210,41 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
             <span>Brew</span>
           </button>
 
-          <button
-            onClick={() => onEdit(recipe)}
-            className="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-zinc-100 transition-colors"
-            title="Edit recipe"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
+          {/* Edit Button with RBAC Protection */}
+          {isEditable ? (
+            <button
+              onClick={() => onEdit(recipe)}
+              className="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-zinc-100 transition-colors"
+              title="Edit recipe"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <div
+              className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed"
+              title="Only author or Admin can edit this recipe"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </div>
+          )}
 
-          <button
-            onClick={() => onDelete(recipe)}
-            className="p-2 rounded-xl bg-zinc-800 hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 transition-colors"
-            title="Delete recipe"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          {/* Delete Button with RBAC Protection */}
+          {isDeletable ? (
+            <button
+              onClick={() => onDelete(recipe)}
+              className="p-2 rounded-xl bg-zinc-800 hover:bg-rose-950/80 text-zinc-400 hover:text-rose-400 transition-colors"
+              title="Delete recipe"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          ) : (
+            <div
+              className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-600 cursor-not-allowed"
+              title="Only author or Admin can delete this recipe"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </div>
+          )}
         </div>
       </div>
     </div>

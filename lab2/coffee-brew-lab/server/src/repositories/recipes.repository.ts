@@ -18,6 +18,8 @@ export interface RecipeRecord {
   tastingNotes: string[];
   imageUrl?: string | null;
   processingMethod?: string;
+  authorId?: number | null;
+  authorName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +41,8 @@ export interface CreateRecipeDTO {
   tastingNotes: string[];
   imageUrl?: string | null;
   processingMethod?: string;
+  authorId?: number | null;
+  authorName?: string | null;
 }
 
 export interface RecipeFilter {
@@ -60,6 +64,8 @@ export class RecipesRepository {
         tasting_notes AS "tastingNotes",
         image_url AS "imageUrl",
         processing_method AS "processingMethod",
+        author_id AS "authorId",
+        author_name AS "authorName",
         created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM recipes
@@ -96,6 +102,8 @@ export class RecipesRepository {
         tasting_notes AS "tastingNotes",
         image_url AS "imageUrl",
         processing_method AS "processingMethod",
+        author_id AS "authorId",
+        author_name AS "authorName",
         created_at AS "createdAt",
         updated_at AS "updatedAt"
       FROM recipes WHERE id = $1`,
@@ -110,8 +118,9 @@ export class RecipesRepository {
       `INSERT INTO recipes (
         title, roaster, origin, method, coffee_weight, water_amount,
         water_temperature, grind_size, brew_time_seconds, rating,
-        acidity, sweetness, body, tasting_notes, processing_method, image_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        acidity, sweetness, body, tasting_notes, processing_method, image_url,
+        author_id, author_name
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
       RETURNING 
         id, title, roaster, origin, method,
         coffee_weight AS "coffeeWeight",
@@ -123,6 +132,8 @@ export class RecipesRepository {
         tasting_notes AS "tastingNotes",
         image_url AS "imageUrl",
         processing_method AS "processingMethod",
+        author_id AS "authorId",
+        author_name AS "authorName",
         created_at AS "createdAt",
         updated_at AS "updatedAt"`,
       [
@@ -142,6 +153,8 @@ export class RecipesRepository {
         data.tastingNotes,
         data.processingMethod,
         data.imageUrl,
+        data.authorId || null,
+        data.authorName || 'Master Barista',
       ]
     );
 
@@ -180,6 +193,8 @@ export class RecipesRepository {
         tasting_notes AS "tastingNotes",
         image_url AS "imageUrl",
         processing_method AS "processingMethod",
+        author_id AS "authorId",
+        author_name AS "authorName",
         created_at AS "createdAt",
         updated_at AS "updatedAt"`,
       [

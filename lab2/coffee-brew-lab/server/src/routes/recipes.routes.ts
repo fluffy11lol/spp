@@ -9,6 +9,7 @@ import {
 } from '../schemas/recipe.openapi.js';
 
 export const recipesRoutes: FastifyPluginAsync = async (fastify) => {
+  // Public routes
   fastify.get(
     '/recipes',
     { schema: listRecipesRouteSchema },
@@ -21,22 +22,31 @@ export const recipesRoutes: FastifyPluginAsync = async (fastify) => {
     recipesHandler.getRecipe.bind(recipesHandler)
   );
 
+  // Protected mutation routes
   fastify.post(
     '/recipes',
-    { schema: createRecipeRouteSchema },
+    {
+      preHandler: [fastify.authenticate, fastify.requireRole(['Barista', 'Admin'])],
+      schema: createRecipeRouteSchema,
+    },
     recipesHandler.createRecipe.bind(recipesHandler)
   );
 
   fastify.put(
     '/recipes/:id',
-    { schema: updateRecipeRouteSchema },
+    {
+      preHandler: [fastify.authenticate, fastify.requireRole(['Barista', 'Admin'])],
+      schema: updateRecipeRouteSchema,
+    },
     recipesHandler.updateRecipe.bind(recipesHandler)
   );
 
   fastify.delete(
     '/recipes/:id',
-    { schema: deleteRecipeRouteSchema },
+    {
+      preHandler: [fastify.authenticate, fastify.requireRole(['Barista', 'Admin'])],
+      schema: deleteRecipeRouteSchema,
+    },
     recipesHandler.deleteRecipe.bind(recipesHandler)
   );
 };
-
