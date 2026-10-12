@@ -1,0 +1,24 @@
+{
+  "name": "lab4-territory-battle",
+  "version": "1.0.0",
+  "description": "Real-time multiplayer territory battle game built with pure Vanilla JS and WebSockets",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "websockets",
+    "multiplayer",
+    "vanilla-js",
+    "realtime",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
